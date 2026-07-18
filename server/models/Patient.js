@@ -11,6 +11,7 @@ const patientSchema = new mongoose.Schema({
   district:   { type: String, required: true },
   province:   { type: String, required: true },
   createdBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 patientSchema.pre('save', async function () {

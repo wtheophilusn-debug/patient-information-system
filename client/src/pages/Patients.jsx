@@ -1,22 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { patientsAPI } from '../services/api';
+import { patientsAPI, usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { FaPlus, FaSearch, FaEye } from 'react-icons/fa';
 
 export default function Patients() {
   const { user } = useAuth();
   const [patients, setPatients] = useState([]);
+  const [patientUsers, setPatientUsers] = useState([]);
   const [q, setQ]               = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState({ firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'' });
+  const [form, setForm]         = useState({ firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'', userId:'' });
   const [error, setError]       = useState('');
 
   const load = async (search = '') => {
     try { const { data } = await patientsAPI.getAll(search); setPatients(data); } catch {}
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // fetch patient-role users for linking
+    usersAPI.getAll().then(r => setPatientUsers(r.data.filter(u => u.role === 'Patient'))).catch(() => {});
+  }, []);
 
   const handleSearch = (e) => { e.preventDefault(); load(q); };
 
@@ -25,7 +30,7 @@ export default function Patients() {
     try {
       await patientsAPI.create(form);
       setShowForm(false);
-      setForm({ firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'' });
+      setForm({ firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'', userId:'' });
       load();
     } catch (err) {
       setError(err.response?.data?.message || 'Error saving patient');
@@ -78,6 +83,13 @@ export default function Patients() {
                       value={form[k]} onChange={e => setForm({...form,[k]:e.target.value})} required />
                   </div>
                 ))}
+                <div className="col-md-12">
+                  <select className="form-select form-select-sm" value={form.userId}
+                    onChange={e => setForm({...form, userId: e.target.value})}>
+                    <option value="">-- Link Patient User Account (optional) --</option>
+                    {patientUsers.map(u => <option key={u._id} value={u._id}>{u.fullName} ({u.username})</option>)}
+                  </select>
+                </div>
               </div>
               <div className="mt-3 d-flex gap-2">
                 <button className="btn btn-primary btn-sm">Save</button>

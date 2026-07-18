@@ -1,4 +1,5 @@
 const Appointment = require('../models/Appointment');
+const Patient     = require('../models/Patient');
 
 const addAppointment = async (req, res) => {
   try {
@@ -11,11 +12,13 @@ const addAppointment = async (req, res) => {
 
 const getAppointments = async (req, res) => {
   try {
-    const filter = req.user.role === 'Patient'
-      ? { patientId: req.user._id }
-      : req.user.role === 'Doctor'
-      ? { doctorId: req.user._id }
-      : {};
+    let filter = {};
+    if (req.user.role === 'Patient') {
+      const patient = await Patient.findOne({ userId: req.user._id });
+      filter = patient ? { patientId: patient._id } : { patientId: null };
+    } else if (req.user.role === 'Doctor') {
+      filter = { doctorId: req.user._id };
+    }
     const appts = await Appointment.find(filter)
       .populate('patientId', 'firstName lastName patientNumber')
       .populate('doctorId', 'fullName')
