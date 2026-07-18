@@ -26,13 +26,13 @@ const roleColor   = { Administrator: 'danger', Doctor: 'primary', Nurse: 'info',
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [stats, setStats]               = useState({ patients: 0, appointments: 0, consultations: 0, users: 0 });
+  const [stats, setStats]                       = useState({ patients: 0, appointments: 0, consultations: 0, users: 0 });
   const [recentPatients, setRecentPatients]     = useState([]);
   const [recentAppointments, setRecentAppointments] = useState([]);
-  const [genderData, setGenderData]     = useState([]);
-  const [apptStatus, setApptStatus]     = useState([]);
-  const [userRoles, setUserRoles]       = useState([]);
-  const [time, setTime]                 = useState(new Date());
+  const [genderData, setGenderData]             = useState([]);
+  const [apptStatus, setApptStatus]             = useState([]);
+  const [userRoles, setUserRoles]               = useState({});
+  const [time, setTime]                         = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -42,14 +42,19 @@ export default function Dashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [p, a, c] = await Promise.all([
-          patientsAPI.getAll(),
+        const isPatient = user.role === 'Patient';
+        const [a, c] = await Promise.all([
           appointmentsAPI.getAll(),
           reportsAPI.consultations(),
         ]);
-        setStats(s => ({ ...s, patients: p.data.length, appointments: a.data.length, consultations: c.data.total }));
-        setRecentPatients(p.data.slice(0, 5));
+        setStats(s => ({ ...s, appointments: a.data.length, consultations: c.data.total }));
         setRecentAppointments(a.data.slice(0, 5));
+
+        if (!isPatient) {
+          const p = await patientsAPI.getAll();
+          setStats(s => ({ ...s, patients: p.data.length }));
+          setRecentPatients(p.data.slice(0, 5));
+        }
 
         if (user.role === 'Administrator') {
           const [u, pr, ar] = await Promise.all([
@@ -70,7 +75,8 @@ export default function Dashboard() {
     load();
   }, [user]);
 
-  const isAdmin = user?.role === 'Administrator';
+  const isAdmin   = user?.role === 'Administrator';
+  const isPatient = user?.role === 'Patient';
 
   return (
     <div>
@@ -89,10 +95,10 @@ export default function Dashboard() {
       {/* Stat Cards */}
       <div className="row g-3 mb-4">
         {[
-          { label: 'Total Patients',  value: stats.patients,      icon: <FaUserInjured size={22} />,  color: 'primary', to: '/patients',      roles: ['Administrator','Receptionist','Nurse','Doctor'] },
-          { label: 'Appointments',    value: stats.appointments,  icon: <FaCalendarAlt size={22} />,  color: 'success', to: '/appointments',  roles: ['Administrator','Doctor','Receptionist','Patient'] },
-          { label: 'Consultations',   value: stats.consultations, icon: <FaStethoscope size={22} />,  color: 'warning', to: '/consultations', roles: ['Administrator','Doctor'] },
-          { label: 'System Users',    value: stats.users,         icon: <FaUsers size={22} />,        color: 'danger',  to: '/users',         roles: ['Administrator'] },
+          { label: 'Total Patients',  value: stats.patients,      icon: <FaUserInjured size={22} />, color: 'primary', to: '/patients',      roles: ['Administrator','Receptionist','Nurse','Doctor'] },
+          { label: 'Appointments',    value: stats.appointments,  icon: <FaCalendarAlt size={22} />, color: 'success', to: '/appointments',  roles: ['Administrator','Doctor','Receptionist','Patient'] },
+          { label: 'Consultations',   value: stats.consultations, icon: <FaStethoscope size={22} />, color: 'warning', to: '/consultations', roles: ['Administrator','Doctor'] },
+          { label: 'System Users',    value: stats.users,         icon: <FaUsers size={22} />,       color: 'danger',  to: '/users',         roles: ['Administrator'] },
         ].filter(t => t.roles.includes(user?.role)).map(t => (
           <div key={t.label} className="col-sm-6 col-lg-3">
             <StatCard {...t} />
@@ -106,45 +112,46 @@ export default function Dashboard() {
           <div className="card-body">
             <h6 className="fw-bold mb-3">⚡ Quick Actions</h6>
             <div className="d-flex flex-wrap gap-2">
-              <Link to="/patients" className="btn btn-primary btn-sm"><FaUserPlus className="me-1" /> Add Patient</Link>
-              <Link to="/appointments" className="btn btn-success btn-sm"><FaCalendarAlt className="me-1" /> New Appointment</Link>
-              <Link to="/users" className="btn btn-danger btn-sm"><FaUsers className="me-1" /> Manage Users</Link>
-              <Link to="/reports" className="btn btn-warning btn-sm"><FaChartPie className="me-1" /> View Reports</Link>
+              <Link to="/patients"      className="btn btn-primary btn-sm"><FaUserPlus className="me-1" />    Add Patient</Link>
+              <Link to="/appointments"  className="btn btn-success btn-sm"><FaCalendarAlt className="me-1" /> New Appointment</Link>
+              <Link to="/users"         className="btn btn-danger btn-sm"><FaUsers className="me-1" />        Manage Users</Link>
+              <Link to="/reports"       className="btn btn-warning btn-sm"><FaChartPie className="me-1" />    View Reports</Link>
               <Link to="/consultations" className="btn btn-info btn-sm text-white"><FaClipboardList className="me-1" /> Consultations</Link>
             </div>
           </div>
         </div>
       )}
 
+      {/* Recent tables */}
       <div className="row g-3 mb-4">
-        {/* Recent Patients */}
-        <div className={isAdmin ? 'col-lg-6' : 'col-12'}>
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3">
-              <h6 className="fw-bold mb-0">🧑‍⚕️ Recent Patients</h6>
-              <Link to="/patients" className="btn btn-sm btn-outline-primary">View All</Link>
-            </div>
-            <div className="card-body p-0">
-              <table className="table table-hover table-sm mb-0">
-                <thead className="table-light">
-                  <tr><th>No.</th><th>Name</th><th>Gender</th><th>District</th></tr>
-                </thead>
-                <tbody>
-                  {recentPatients.length ? recentPatients.map(p => (
-                    <tr key={p._id}>
-                      <td><span className="badge bg-primary">{p.patientNumber}</span></td>
-                      <td>{p.firstName} {p.lastName}</td>
-                      <td>{p.gender}</td>
-                      <td>{p.district}</td>
-                    </tr>
-                  )) : <tr><td colSpan={4} className="text-center text-muted py-3">No patients yet</td></tr>}
-                </tbody>
-              </table>
+        {!isPatient && (
+          <div className={isAdmin ? 'col-lg-6' : 'col-12'}>
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3">
+                <h6 className="fw-bold mb-0">🧑‍⚕️ Recent Patients</h6>
+                <Link to="/patients" className="btn btn-sm btn-outline-primary">View All</Link>
+              </div>
+              <div className="card-body p-0">
+                <table className="table table-hover table-sm mb-0">
+                  <thead className="table-light">
+                    <tr><th>No.</th><th>Name</th><th>Gender</th><th>District</th></tr>
+                  </thead>
+                  <tbody>
+                    {recentPatients.length ? recentPatients.map(p => (
+                      <tr key={p._id}>
+                        <td><span className="badge bg-primary">{p.patientNumber}</span></td>
+                        <td>{p.firstName} {p.lastName}</td>
+                        <td>{p.gender}</td>
+                        <td>{p.district}</td>
+                      </tr>
+                    )) : <tr><td colSpan={4} className="text-center text-muted py-3">No patients yet</td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Recent Appointments */}
         <div className={isAdmin ? 'col-lg-6' : 'col-12'}>
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3">
@@ -171,10 +178,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Admin only: Gender breakdown + Appointment status + User roles */}
+      {/* Admin only: Gender + Appointment status + User roles */}
       {isAdmin && (
         <div className="row g-3">
-          {/* Patients by Gender */}
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-header bg-white border-0 pt-3">
@@ -199,7 +205,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Appointment Status */}
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-header bg-white border-0 pt-3">
@@ -221,7 +226,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Users by Role */}
           <div className="col-lg-4">
             <div className="card border-0 shadow-sm h-100">
               <div className="card-header bg-white border-0 pt-3">
