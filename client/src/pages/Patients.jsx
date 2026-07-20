@@ -2,49 +2,80 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { patientsAPI, usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { FaPlus, FaSearch, FaEye } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaEye, FaEdit } from 'react-icons/fa';
+
+const blank = { firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'', userId:'' };
 
 export default function Patients() {
   const { user } = useAuth();
-  const [patients, setPatients] = useState([]);
+  const [patients, setPatients]       = useState([]);
+  const [allPatients, setAllPatients] = useState([]);
   const [patientUsers, setPatientUsers] = useState([]);
   const [q, setQ]               = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState({ firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'', userId:'' });
+  const [editing, setEditing]   = useState(null);
+  const [form, setForm]         = useState(blank);
   const [error, setError]       = useState('');
 
-  const load = async (search = '') => {
-    try { const { data } = await patientsAPI.getAll(search); setPatients(data); } catch {}
+  const load = async () => {
+    try {
+      const { data } = await patientsAPI.getAll();
+      setAllPatients(data);
+      setPatients(data);
+    } catch {}
   };
 
   useEffect(() => {
     load();
-    // fetch patient-role users for linking
     usersAPI.getAll().then(r => setPatientUsers(r.data.filter(u => u.role === 'Patient'))).catch(() => {});
   }, []);
 
-  const handleSearch = (e) => { e.preventDefault(); load(q); };
+  // Live search
+  useEffect(() => {
+    if (!q.trim()) { setPatients(allPatients); return; }
+    const lower = q.toLowerCase();
+    setPatients(allPatients.filter(p =>
+      p.patientNumber?.toLowerCase().includes(lower) ||
+      p.firstName?.toLowerCase().includes(lower) ||
+      p.lastName?.toLowerCase().includes(lower) ||
+      p.phone?.includes(q)
+    ));
+  }, [q, allPatients]);
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setError('');
     try {
-      await patientsAPI.create(form);
-      setShowForm(false);
-      setForm({ firstName:'', lastName:'', gender:'Male', dob:'', phone:'', sector:'', district:'', province:'', userId:'' });
-      load();
+      if (editing) {
+        await patientsAPI.update(editing, form);
+      } else {
+        await patientsAPI.create(form);
+      }
+      setShowForm(false); setEditing(null); setForm(blank); load();
     } catch (err) {
       setError(err.response?.data?.message || 'Error saving patient');
     }
   };
 
-  const canAdd = ['Administrator','Receptionist'].includes(user?.role);
+  const handleEdit = (p) => {
+    setForm({
+      firstName: p.firstName, lastName: p.lastName, gender: p.gender,
+      dob: p.dob?.split('T')[0], phone: p.phone,
+      sector: p.sector, district: p.district, province: p.province,
+      userId: p.userId || '',
+    });
+    setEditing(p._id);
+    setShowForm(true);
+    window.scrollTo(0, 0);
+  };
+
+  const canEdit = ['Administrator', 'Receptionist'].includes(user?.role);
 
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4 className="mb-0">Patients</h4>
-        {canAdd && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
+        {canEdit && (
+          <button className="btn btn-primary btn-sm" onClick={() => { setForm(blank); setEditing(null); setShowForm(!showForm); }}>
             <FaPlus className="me-1" /> Register Patient
           </button>
         )}
@@ -53,7 +84,7 @@ export default function Patients() {
       {showForm && (
         <div className="card mb-4 shadow-sm">
           <div className="card-body">
-            <h6 className="card-title">New Patient</h6>
+            <h6 className="card-title">{editing ? 'Edit Patient' : 'New Patient'}</h6>
             {error && <div className="alert alert-danger py-2">{error}</div>}
             <form onSubmit={handleSubmit}>
               <div className="row g-2">
@@ -92,8 +123,8 @@ export default function Patients() {
                 </div>
               </div>
               <div className="mt-3 d-flex gap-2">
-                <button className="btn btn-primary btn-sm">Save</button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>Cancel</button>
+                <button className="btn btn-primary btn-sm">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setEditing(null); }}>Cancel</button>
               </div>
             </form>
           </div>
@@ -102,11 +133,14 @@ export default function Patients() {
 
       <div className="card shadow-sm">
         <div className="card-body">
-          <form className="d-flex gap-2 mb-3" onSubmit={handleSearch}>
-            <input className="form-control form-control-sm" placeholder="Search by name, number or phone..."
-              value={q} onChange={e => setQ(e.target.value)} />
-            <button className="btn btn-outline-primary btn-sm"><FaSearch /></button>
-          </form>
+          <div className="d-flex gap-2 mb-3">
+            <div className="input-group input-group-sm">
+              <span className="input-group-text"><FaSearch /></span>
+              <input className="form-control" placeholder="Search by name, number or phone..."
+                value={q} onChange={e => setQ(e.target.value)} />
+              {q && <button className="btn btn-outline-secondary" onClick={() => setQ('')}>✕</button>}
+            </div>
+          </div>
           <div className="table-responsive">
             <table className="table table-hover table-sm align-middle">
               <thead className="table-primary">
@@ -122,10 +156,9 @@ export default function Patients() {
                     <td>{new Date(p.dob).toLocaleDateString()}</td>
                     <td>{p.phone}</td>
                     <td>{p.district}</td>
-                    <td>
-                      <Link to={`/patients/${p._id}`} className="btn btn-sm btn-outline-primary">
-                        <FaEye />
-                      </Link>
+                    <td className="d-flex gap-1">
+                      <Link to={`/patients/${p._id}`} className="btn btn-sm btn-outline-primary"><FaEye /></Link>
+                      {canEdit && <button className="btn btn-sm btn-outline-warning" onClick={() => handleEdit(p)}><FaEdit /></button>}
                     </td>
                   </tr>
                 ))}
