@@ -46,10 +46,12 @@ export default function Patients() {
   const handleSubmit = async (e) => {
     e.preventDefault(); setError('');
     try {
+      const payload = { ...form };
+      if (!payload.userId) delete payload.userId;
       if (editing) {
-        await patientsAPI.update(editing, form);
+        await patientsAPI.update(editing, payload);
       } else {
-        await patientsAPI.create(form);
+        await patientsAPI.create(payload);
       }
       setShowForm(false); setEditing(null); setForm(blank); load();
     } catch (err) {
