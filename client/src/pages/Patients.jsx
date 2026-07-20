@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { patientsAPI, usersAPI } from '../services/api';
+import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { FaPlus, FaSearch, FaEye, FaEdit } from 'react-icons/fa';
 
@@ -27,7 +28,7 @@ export default function Patients() {
 
   useEffect(() => {
     load();
-    usersAPI.getAll().then(r => setPatientUsers(r.data.filter(u => u.role === 'Patient'))).catch(() => {});
+    API.get('/users/patients-list').then(r => setPatientUsers(r.data)).catch(() => {});
   }, []);
 
   // Live search
