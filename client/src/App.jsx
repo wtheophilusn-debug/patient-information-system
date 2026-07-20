@@ -33,7 +33,7 @@ export default function App() {
           <Route path="/appointments"     element={<Layout><Appointments /></Layout>} />
           <Route path="/reports"          element={<Layout><RoleRoute roles={['Administrator','Doctor']}><Reports /></RoleRoute></Layout>} />
           <Route path="/users"            element={<Layout><RoleRoute roles={['Administrator']}><Users /></RoleRoute></Layout>} />
-          <Route path="*"                 element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
