@@ -14,8 +14,9 @@ const getAppointments = async (req, res) => {
   try {
     let filter = {};
     if (req.user.role === 'Patient') {
-      const patient = await Patient.findOne({ userId: req.user._id });
-      filter = patient ? { patientId: patient._id } : { patientId: null };
+      const patients = await Patient.find({ userId: req.user._id });
+      const patientIds = patients.map(p => p._id);
+      filter = { patientId: { $in: patientIds } };
     } else if (req.user.role === 'Doctor') {
       filter = { doctorId: req.user._id };
     }
