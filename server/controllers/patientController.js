@@ -41,7 +41,9 @@ const createPatient = async (req, res) => {
 
 const updatePatient = async (req, res) => {
   try {
-    const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const body = { ...req.body };
+    if (!body.userId) delete body.userId;
+    const patient = await Patient.findByIdAndUpdate(req.params.id, body, { new: true });
     if (!patient) return res.status(404).json({ message: 'Patient not found' });
     res.json(patient);
   } catch (err) {
