@@ -1,3 +1,4 @@
+// Patient Information System API - v1.1
 const express = require('express');
 const cors    = require('cors');
 const morgan  = require('morgan');
